@@ -42,6 +42,12 @@ st.markdown(f"""
 <style>
   .stApp {{ background:{BG}; }}
   html, body, [class*="css"] {{ font-family:{FONT}; color:{TXT}; }}
+  /* 안전망 — 기본(다크) 테마의 흰 글씨가 라이트 배경에 남지 않도록 강제 */
+  div[data-testid="stMarkdownContainer"] p,
+  div[data-testid="stMarkdownContainer"] li,
+  div[data-testid="stMarkdownContainer"] span:not([class]),
+  div[data-testid="stExpanderDetails"] p {{ color:{TXT}; }}
+  div[data-testid="stWidgetLabel"] p {{ color:{TXT_HI} !important; font-weight:700; }}
   #MainMenu, header, footer {{ visibility:hidden; }}
   .block-container {{ padding:2.6rem 3.4rem 3rem 3.4rem; max-width:1620px; }}
 
@@ -56,11 +62,30 @@ st.markdown(f"""
   .panel-h {{ font-size:1.05rem; font-weight:800; color:{TXT_HI}; margin:.1rem 0 .1rem 0; }}
   .panel-c {{ font-size:.82rem; color:{MUTED}; margin-bottom:.5rem; }}
 
-  div[data-testid="stMetric"] {{
-      background:{PANEL}; border:1px solid {BORDER}; border-radius:16px;
-      padding:1.0rem 1.2rem; box-shadow:0 1px 3px rgba(15,23,42,.06); }}
-  div[data-testid="stMetricLabel"] p {{ font-size:.8rem; color:{MUTED}; font-weight:700; }}
-  div[data-testid="stMetricValue"] {{ font-size:1.7rem; font-weight:800; color:{TXT_HI}; }}
+  /* ── KPI 카드 (자체 HTML — 테마 독립·가독성 완전 통제) ── */
+  .kpi {{ background:{PANEL}; border:1px solid {BORDER}; border-left-width:5px;
+          border-radius:16px; padding:1.05rem 1.25rem;
+          box-shadow:0 1px 3px rgba(15,23,42,.06); }}
+  .kpi-lab {{ font-size:.8rem; color:{MUTED}; font-weight:700; letter-spacing:.02em; }}
+  .kpi-val {{ font-size:2.05rem; font-weight:800; color:{TXT_HI}; line-height:1.2;
+              margin-top:.15rem; }}
+  .kpi-unit {{ font-size:1.0rem; font-weight:700; color:{MUTED}; margin-left:.25rem; }}
+  .kpi-sub {{ font-size:.78rem; font-weight:700; margin-top:.3rem; }}
+
+  /* ── 셀렉트박스·익스팬더 라이트 강제 (기본 다크 테마 무력화) ── */
+  div[data-baseweb="select"] > div {{ background:{PANEL} !important;
+      border:1px solid {BORDER} !important; color:{TXT_HI} !important;
+      border-radius:12px !important; }}
+  div[data-baseweb="select"] svg {{ fill:{MUTED} !important; }}
+  div[data-baseweb="popover"] ul, ul[data-baseweb="menu"] {{ background:{PANEL} !important;
+      border:1px solid {BORDER} !important; }}
+  li[role="option"] {{ color:{TXT} !important; background:{PANEL} !important; }}
+  li[role="option"]:hover, li[aria-selected="true"] {{ background:#EFF6FF !important;
+      color:{TXT_HI} !important; }}
+  div[data-testid="stExpander"] details {{ background:{PANEL}; border:1px solid {BORDER};
+      border-radius:12px; }}
+  div[data-testid="stExpander"] summary {{ color:{TXT_HI} !important; font-weight:700; }}
+  div[data-testid="stExpander"] summary svg {{ fill:{MUTED} !important; }}
 
   .glass {{ background:{PANEL}; border:1px solid {BORDER}; border-radius:16px;
             padding:1.1rem 1.3rem; box-shadow:0 1px 3px rgba(15,23,42,.06); }}
@@ -262,11 +287,22 @@ st.markdown('<div class="so-sub">VC 투자 심의 시연 · 실시간 관제 →
             unsafe_allow_html=True)
 st.markdown('<hr class="so-rule">', unsafe_allow_html=True)
 
+def kpi(col, label, value, unit, sub, accent, sub_color=None, blink=False):
+    """테마 독립 KPI 카드 — 색상을 코드에서 100% 통제."""
+    sub_html = (f'<div class="kpi-sub" style="color:{sub_color or MUTED};'
+                f'{"animation:blink 1.1s infinite;" if blink else ""}">{sub}</div>')
+    col.markdown(
+        f'<div class="kpi" style="border-left-color:{accent};">'
+        f'<div class="kpi-lab">{label}</div>'
+        f'<div class="kpi-val">{value}<span class="kpi-unit">{unit}</span></div>'
+        f'{sub_html}</div>', unsafe_allow_html=True)
+
 k1, k2, k3, k4 = st.columns(4, gap="medium")
-k1.metric("관제 노드", f"{len(nodes)} 개")
-k2.metric("정상 가동", f"{len(nodes)-danger_n} 개")
-k3.metric("위험 감지", f"{danger_n} 개", delta="점검 필요", delta_color="inverse")
-k4.metric("AI 종합 안전 등급", GRADE)
+kpi(k1, "관제 노드", f"{len(nodes)}", "개", "전 구역 온라인", BLUE, BLUE)
+kpi(k2, "정상 가동", f"{len(nodes)-danger_n}", "개", "센서 정상 수신 중", GREEN, GREEN)
+kpi(k3, "위험 감지", f"{danger_n}", "개", "⚠ 즉시 점검 필요", WARN, WARN, blink=True)
+kpi(k4, "AI 종합 안전 등급", f'<span style="color:{GRADE_COLOR};">{GRADE}</span>', "등급",
+    f"평균 예측 확률 {avg_ai:.1f}%", GRADE_COLOR)
 
 st.markdown("<br>", unsafe_allow_html=True)
 
