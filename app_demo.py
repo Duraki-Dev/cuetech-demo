@@ -109,9 +109,15 @@ st.markdown(f"""
       font-size:1.0rem; border:none; border-radius:12px; padding:.72rem 1rem;
       box-shadow:0 2px 8px rgba(31,56,100,.25); }}
   .stButton>button:hover {{ filter:brightness(1.12); }}
+  /* 버튼 라벨은 마크다운 p로 렌더되므로 안전망 규칙보다 우선해 명시 지정 */
+  .stButton button p, .stButton button div,
+  .stButton button span {{ color:#FFFFFF !important; font-weight:800; }}
   div[data-testid="stDownloadButton"]>button {{ width:100%; background:#fff;
       color:{NAVY}; font-weight:800; border:1.5px solid {NAVY}; border-radius:12px;
       padding:.66rem 1rem; }}
+  div[data-testid="stDownloadButton"] button p,
+  div[data-testid="stDownloadButton"] button div,
+  div[data-testid="stDownloadButton"] button span {{ color:{NAVY} !important; font-weight:800; }}
 </style>
 """, unsafe_allow_html=True)
 
