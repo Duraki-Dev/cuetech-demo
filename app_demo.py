@@ -281,14 +281,31 @@ left, right = st.columns([1.15, 1], gap="large")
 # ── A. 실시간 관제 (좌측 · 지도 · 클릭 연동) ──
 with left:
     st.markdown('<div class="panel-h">A. 실시간 관제</div>', unsafe_allow_html=True)
-    st.markdown('<div class="panel-c">울산 산업단지 · 센서 노드를 <b>클릭</b>하면 우측 AI 패널이 '
-                '해당 노드로 전환됩니다 (<span style="color:#16A34A;">●</span> 정상 / '
-                '<span style="color:#DC2626;">●</span> 위험 점멸)</div>', unsafe_allow_html=True)
+    st.markdown('<div class="panel-c">울산 산업단지 · <b>양방향 연동</b> — 노드를 클릭하면 우측 AI 패널이 전환되고, '
+                '우측에서 노드를 선택하면 지도가 해당 위치로 <b>자동 이동·강조</b>됩니다 '
+                '(<span style="color:#16A34A;">●</span> 정상 / '
+                '<span style="color:#DC2626;">●</span> 위험 점멸 / '
+                '<span style="color:#2563EB;">◎</span> 선택 노드)</div>', unsafe_allow_html=True)
 
     ok = nodes[nodes["status"] == "정상"]
     ng = nodes[nodes["status"] == "위험"]
 
+    # ★ 양방향 동기화 — 현재 선택 노드(셀렉트박스와 동일 키)를 지도 중심·강조에 반영
+    sel_now = st.session_state["node_sel"]
+    sel_row = nodes[nodes["name"] == sel_now].iloc[0]
+
     fig_map = go.Figure()
+    # 선택 노드 강조 (핑/헤일로 — 가장 아래 레이어)
+    fig_map.add_trace(go.Scattermap(
+        lat=[sel_row["lat"]], lon=[sel_row["lon"]], mode="markers",
+        marker=dict(size=46, color=BLUE, opacity=0.18),
+        hoverinfo="skip", showlegend=False))
+    fig_map.add_trace(go.Scattermap(
+        lat=[sel_row["lat"]], lon=[sel_row["lon"]], mode="markers+text", name="선택 노드",
+        marker=dict(size=26, color=BLUE, opacity=0.45),
+        text=[sel_now], textposition="bottom center",
+        textfont=dict(color=BLUE, size=12),
+        hoverinfo="skip"))
     # 위험 — 이중 헤일로 (클릭 대상은 내부 마커)
     fig_map.add_trace(go.Scattermap(
         lat=ng["lat"], lon=ng["lon"], mode="markers", name="위험(외곽)",
@@ -308,14 +325,15 @@ with left:
         hovertemplate="<b>%{text}</b> — 클릭하여 상세<extra></extra>"))
     fig_map.update_layout(
         map=dict(style="carto-positron",
-                 center=dict(lat=BASE_LAT, lon=BASE_LON), zoom=12.1),
+                 center=dict(lat=float(sel_row["lat"]), lon=float(sel_row["lon"])),
+                 zoom=12.9),
         height=520, margin=dict(l=0, r=0, t=0, b=0),
         paper_bgcolor="rgba(0,0,0,0)",
         legend=dict(orientation="h", y=0.02, x=0.02,
                     font=dict(color=TXT, size=12), bgcolor="rgba(255,255,255,.75)"),
         hoverlabel=dict(bgcolor="#0F172A", font=dict(family=FONT, color="#FFFFFF")))
 
-    # ★ 지도 클릭 이벤트 → session_state 동기화
+    # ★ 지도 클릭 이벤트 → session_state 동기화 (양방향 충돌 방지)
     event = st.plotly_chart(fig_map, width="stretch", key="map",
                             on_select="rerun", selection_mode="points",
                             config={"displayModeBar": False})
@@ -327,8 +345,17 @@ with left:
         clicked = pts[0].get("customdata")
         if isinstance(clicked, (list, tuple)):
             clicked = clicked[0]
-        if clicked in nodes["name"].values and clicked != st.session_state["node_sel"]:
-            st.session_state["node_sel"] = clicked
+        # 스테일 가드: 같은 클릭 이벤트가 셀렉트박스 선택을 되돌리지 않도록,
+        # '마지막으로 처리한 클릭'과 다를 때만 반영한다.
+        if (clicked in nodes["name"].values
+                and clicked != st.session_state.get("last_map_click")):
+            st.session_state["last_map_click"] = clicked
+            if clicked != st.session_state["node_sel"]:
+                st.session_state["node_sel"] = clicked
+                st.rerun()   # 즉시 재실행 → 지도 중심·강조가 클릭 노드로 이동
+    else:
+        # 선택 해제(토글 오프) 시 가드 초기화 → 동일 노드 재클릭 허용
+        st.session_state["last_map_click"] = None
 
     chips = " ".join(
         f'<span class="chip chip-warn">⚠ {r["name"]} · {r["gas"]}ppm</span>'
